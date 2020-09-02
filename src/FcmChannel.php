@@ -32,20 +32,35 @@ class FcmChannel
     {
         $token = $notifiable->routeNotificationFor('fcm', $notification);
 
-        if (empty($token)) {
-            return [];
-        }
+        // 2020-09-02 fix per uso topic dove non viene inviato token
+        // basato su:
+        // https://github.com/laravel-notification-channels/fcm/pull/44
+        // if (empty($token)) {
+        //     return [];
+        // }
 
         // Get the message from the notification class
         $fcmMessage = $notification->toFcm($notifiable);
 
-        if (! $fcmMessage instanceof Message) {
+        if (!$fcmMessage instanceof Message) {
             throw new CouldNotSendNotification('The toFcm() method only accepts instances of ' . Message::class);
         }
 
         $responses = [];
 
-        if (! is_array($token)) {
+        // 2020-09-02 fix per uso topic dove non viene inviato token
+        if (empty($token) && $fcmMessage instanceof  FcmMessage) {
+
+            if ($fcmMessage->getTopic() || $fcmMessage->getCondition())
+                $responses[] = $this->sendToFcm($fcmMessage);
+        } else if (empty($token) && $fcmMessage instanceof  CloudMessage) {
+
+            if ($fcmMessage->hasTarget())
+                $responses[] = $this->sendToFcm($fcmMessage);
+        } else if (empty($token)) {
+
+            $responses = [];
+        } else if (!is_array($token)) {
             if ($fcmMessage instanceof CloudMessage) {
                 $fcmMessage = $fcmMessage->withChangedTarget('token', $token);
             }
